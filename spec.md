@@ -31,7 +31,7 @@ CSV / SQL file
   LLM prompt: schema + user question
      |
      v
-  Qwen3.5-4B via llama.cpp (generates SQL)
+  Qwen3.5-4B via llama-cpp-python (generates SQL)
      |
      v
   DuckDB executes the SQL
@@ -43,34 +43,34 @@ CSV / SQL file
 
 ## Input formats
 
-- **CSV** — DuckDB reads it natively. Auto-detects delimiters, headers, types.
+- **CSV** — DuckDB reads it natively via `read_csv()`. Auto-detects delimiters, headers, types.
 - **SQL dump files** — Executed directly against DuckDB. Supports CREATE TABLE + INSERT statements.
-- Multiple files at once: `quickinsight sales.csv customers.csv` creates multiple tables.
-- Directory: `quickinsight ./data/` loads all CSV/SQL files in the directory.
+- Multiple files at once: `quickinsight sales.csv customers.csv` — each CSV becomes a table named after the file.
+- Directory: `quickinsight ./data/` — loads all CSV/SQL files in the directory.
 
 ## Architecture
 
 ### Backend (Python)
 
 - **FastAPI** — serves the UI and the API
-- **DuckDB** — SQL engine, loads and queries data
-- **llama-cpp-python** — runs the LLM locally, no Ollama dependency
-- **Schema extraction** — reads DuckDB's information_schema, grabs DDL + sample rows per table
+- **DuckDB** — SQL engine. Loads CSV/SQL files, executes queries. In-process, no server.
+- **llama-cpp-python** — runs the LLM in-process. Loads a GGUF model, exposes OpenAI-compatible completions.
+- **Schema extraction** — on file load, queries DuckDB's `information_schema` to get table names, column names, column types, and 3 sample rows per table. This becomes the LLM prompt context.
 
 ### Frontend
 
-- Single-page web UI served by the backend
-- Three panels:
-  1. **Chat** — natural language input, streaming responses
-  2. **Data explorer** — table list, schema view, browse rows, filter, sort
-  3. **Results** — query results as table, generated SQL (editable), re-run button
-- Auto-chart: when results look like aggregations or time series, show a chart
+- Single-page web UI served by FastAPI as static files
+- Two panels:
+  1. **Chat** — natural language input, streaming answer, generated SQL shown below each answer (editable, re-runnable)
+  2. **Data explorer** — table list sidebar, click a table to browse rows with sort/filter/pagination
+- When query results are numeric aggregations or time series, auto-show a chart.
 
 ### LLM
 
 - **Model:** Qwen3.5-4B (Q4_K_M GGUF, ~2.5GB)
-- Downloaded automatically on first run to `~/.quickinsight/models/`
-- Served via llama-cpp-python in-process (no separate server)
+- Auto-downloaded on first run to `~/.quickinsight/models/`
+- Loaded via llama-cpp-python in-process
+- Alternatively: `--api-url http://localhost:8000/v1` to use any external OpenAI-compatible server (vLLM, Ollama, llama.cpp server, etc.)
 
 ### Text-to-SQL prompt
 
@@ -80,7 +80,7 @@ You are a DuckDB SQL expert. Given the following tables:
 {CREATE TABLE statements with column types}
 
 Sample data:
-{3-5 rows per table}
+{3-5 rows per table, formatted as INSERT statements}
 
 Write a DuckDB SQL query that answers: {user question}
 
@@ -90,7 +90,16 @@ Rules:
 - Always qualify column names with table names when joining
 ```
 
-If the generated SQL errors, the error message is fed back to the LLM for one retry.
+If the generated SQL errors on execution, the error is fed back to the LLM for one retry.
+
+## API endpoints
+
+```
+POST /api/ask        { "question": "..." }  →  { "sql": "...", "results": [...], "columns": [...] }
+POST /api/sql        { "sql": "..." }       →  { "results": [...], "columns": [...] }
+GET  /api/tables                            →  [{ "name": "...", "columns": [...], "row_count": N }]
+GET  /api/tables/:name?limit=50&offset=0    →  { "columns": [...], "rows": [...], "total": N }
+```
 
 ## CLI
 
@@ -100,7 +109,8 @@ quickinsight <file_or_files_or_directory>
 
 Options:
 - `--port 8642` — default port
-- `--model /path/to/model.gguf` — use a specific model file
+- `--model /path/to/model.gguf` — use a specific GGUF model file
+- `--api-url http://...` — use an external OpenAI-compatible API instead of local model
 - `--no-browser` — don't auto-open browser
 
 ## Install
@@ -109,7 +119,14 @@ Options:
 pip install quickinsight
 ```
 
-Requires Python 3.10+. Model downloads on first run (~2.5GB).
+Requires Python 3.10+. Model auto-downloads on first run (~2.5GB).
+
+## Dependencies
+
+- `fastapi` + `uvicorn` — web server
+- `duckdb` — SQL engine
+- `llama-cpp-python` — local LLM inference
+- `huggingface-hub` — model download
 
 ## What this is NOT
 
