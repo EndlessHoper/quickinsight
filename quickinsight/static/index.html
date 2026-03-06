@@ -483,11 +483,7 @@ function uploadFile(file) {
     const form = new FormData();
     form.append('file', file);
     const size = formatSize(file.size);
-    let uploadDone = false;
-    let startTime = Date.now();
-    let timerInterval;
 
-    // Upload progress
     xhr.upload.onprogress = (e) => {
       if (!e.lengthComputable) return;
       const pct = Math.round(e.loaded / e.total * 100);
@@ -498,31 +494,48 @@ function uploadFile(file) {
       `;
     };
 
-    xhr.upload.onload = () => {
-      uploadDone = true;
-      startTime = Date.now();
-      timerInterval = setInterval(() => {
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
-        landingStatus.innerHTML = `
-          <div class="status-text"><div class="spinner"></div> Processing ${file.name} (${size})... ${elapsed}s</div>
-          <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:100%"></div></div>
-        `;
-      }, 500);
-    };
-
     xhr.onload = () => {
-      clearInterval(timerInterval);
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(JSON.parse(xhr.responseText));
+        const data = JSON.parse(xhr.responseText);
+        pollJob(data.job_id, file.name, size).then(resolve).catch(reject);
       } else {
         try { reject(JSON.parse(xhr.responseText)); }
         catch { reject({ detail: xhr.statusText }); }
       }
     };
-    xhr.onerror = () => { clearInterval(timerInterval); reject({ detail: 'Upload failed' }); };
+    xhr.onerror = () => reject({ detail: 'Upload failed' });
 
     xhr.open('POST', '/api/upload');
     xhr.send(form);
+  });
+}
+
+function pollJob(jobId, fileName, size) {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+    const poll = async () => {
+      try {
+        const job = await api('GET', `/api/job/${jobId}`);
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+        if (job.status === 'done') {
+          landingStatus.innerHTML = `<div class="status-text">Done</div>`;
+          resolve(job);
+        } else if (job.status === 'error') {
+          reject({ detail: job.error || 'Processing failed' });
+        } else {
+          const pct = job.progress || 0;
+          const stage = job.stage || 'Processing...';
+          landingStatus.innerHTML = `
+            <div class="status-text"><div class="spinner"></div> ${stage} (${elapsed}s)</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+          `;
+          setTimeout(poll, 500);
+        }
+      } catch {
+        setTimeout(poll, 1000);
+      }
+    };
+    poll();
   });
 }
 
@@ -566,7 +579,9 @@ addFileInput.onchange = async () => {
   for (const file of addFileInput.files) {
     const form = new FormData();
     form.append('file', file);
-    await fetch('/api/upload', { method: 'POST', body: form });
+    const res = await fetch('/api/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    await pollJob(data.job_id, file.name, formatSize(file.size));
   }
   tables = await api('GET', '/api/tables');
   renderTableList();

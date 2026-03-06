@@ -16,9 +16,9 @@ def main():
     args = parser.parse_args()
 
     # Import here so --help is fast
+    from . import server
     from .db import Database
     from .llm import LLM
-    from . import server
 
     # Load data
     server.db = Database()
@@ -52,3 +52,4 @@ def main():
         uvicorn.run(server.app, host="0.0.0.0", port=args.port, log_level="warning")
     finally:
         server.llm.stop()
+        server.db.close()

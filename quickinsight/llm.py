@@ -1,9 +1,9 @@
-from pathlib import Path
 import json
 import re
 import subprocess
 import time
 import urllib.request
+from pathlib import Path
 
 SQL_PROMPT = """/no_think
 You are a DuckDB SQL expert. Given the following tables:
@@ -30,7 +30,8 @@ The SQL query run was:
 The results were (showing column names then rows):
 {results}
 
-Write a brief, natural language summary of the findings. Be specific with numbers. Keep it to 2-3 sentences. Do not repeat the question. Do not mention SQL."""
+Write a brief, natural language summary of the findings. Be specific with numbers.
+Keep it to 2-3 sentences. Do not repeat the question. Do not mention SQL."""
 
 DEFAULT_MODEL_REPO = "unsloth/Qwen3.5-4B-GGUF"
 DEFAULT_MODEL_FILE = "Qwen3.5-4B-Q4_K_M.gguf"

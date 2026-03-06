@@ -18,3 +18,10 @@ dependencies = [
 
 [project.scripts]
 quickinsight = "quickinsight.cli:main"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "A", "B", "UP"]
+ignore = ["B008"]
