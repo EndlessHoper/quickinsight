@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickInsight</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #ffffff;
+  --surface: #f8f8f8;
+  --border: #e2e2e2;
+  --text: #1a1a1a;
+  --muted: #888;
+  --accent: #1a1a1a;
+  --accent-light: #f0f0f0;
+  --error: #d44;
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+/* ===== LANDING SCREEN ===== */
+#landing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  flex-direction: column;
+  gap: 24px;
+}
+#landing h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+#landing p {
+  color: var(--muted);
+  font-size: 15px;
+}
+#dropzone {
+  width: 480px;
+  max-width: 90vw;
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 64px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+#dropzone:hover, #dropzone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+#dropzone .icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+#dropzone .label {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+#dropzone .sublabel {
+  color: var(--muted);
+  font-size: 13px;
+}
+#file-input { display: none; }
+#landing-status {
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 20px;
+}
+#landing-footer {
+  position: fixed;
+  bottom: 24px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ===== APP SCREEN ===== */
+#app {
+  display: none;
+  height: 100vh;
+  overflow: hidden;
+}
+#app.visible { display: flex; }
+#landing.hidden { display: none; }
+
+/* Sidebar */
+#sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+#sidebar-header {
+  padding: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#sidebar-header span { opacity: 0.5; font-weight: 400; font-size: 11px; }
+.table-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.table-item:hover { background: #f0f0f0; }
+.table-item.active { background: #e8e8e8; }
+.table-name { font-weight: 500; font-size: 13px; }
+.table-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+#add-file-btn {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+#add-file-btn:hover { background: #f0f0f0; color: var(--text); }
+
+/* Main area */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Tab bar */
+#tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); border-bottom-color: var(--text); }
+
+/* Content */
+#content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Chat view */
+#chat-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+.message {
+  margin-bottom: 20px;
+  max-width: 800px;
+}
+.message-user {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.message-sql {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  position: relative;
+  line-height: 1.5;
+}
+.message-sql .edit-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font);
+}
+.message-sql .edit-btn:hover { color: var(--text); border-color: var(--text); }
+.message-result { overflow-x: auto; }
+.message-error {
+  color: var(--error);
+  padding: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* Data table */
+table {
+  border-collapse: collapse;
+  font-size: 13px;
+  width: 100%;
+}
+th, td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+th {
+  background: var(--surface);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+tr:hover td { background: #fafafa; }
+
+/* Chat input */
+#input-bar {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+}
+#question {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+}
+#question:focus { border-color: var(--text); }
+#question::placeholder { color: #bbb; }
+#send-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-family: var(--font);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+}
+#send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Explorer view */
+#explorer-view {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+#explorer-header {
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+#explorer-header h2 { font-size: 15px; font-weight: 600; }
+#explorer-info { color: var(--muted); font-size: 12px; }
+#explorer-table-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+#explorer-pagination {
+  padding: 10px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+#explorer-pagination button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+}
+#explorer-pagination button:hover { background: var(--surface); }
+#explorer-pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Loading */
+.loading { color: var(--muted); padding: 8px 0; font-size: 13px; }
+.loading::after { content: '...'; animation: dots 1.5s steps(3, end) infinite; }
+@keyframes dots { 0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; } }
+
+/* Chart */
+.chart-container {
+  margin: 10px 0;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.chart-container canvas { width: 100% !important; max-height: 250px; }
+</style>
+</head>
+<body>
+
+<!-- LANDING -->
+<div id="landing">
+  <h1>QuickInsight</h1>
+  <p>Chat with your data. Fully local.</p>
+  <div id="dropzone">
+    <div class="icon">+</div>
+    <div class="label">Drop a file here or click to select</div>
+    <div class="sublabel">.csv or .sql</div>
+  </div>
+  <input type="file" id="file-input" accept=".csv,.sql" multiple>
+  <div id="landing-status"></div>
+  <div id="landing-footer">Everything runs on your machine. Nothing leaves localhost.</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-header">Tables <span>QuickInsight</span></div>
+    <div id="add-file-btn">+ Add file</div>
+    <input type="file" id="add-file-input" accept=".csv,.sql" multiple style="display:none">
+    <div id="table-list"></div>
+  </div>
+
+  <div id="main">
+    <div id="tabs">
+      <div class="tab active" data-tab="chat">Chat</div>
+      <div class="tab" data-tab="explorer">Explorer</div>
+    </div>
+
+    <div id="content">
+      <div id="chat-view">
+        <div id="messages">
+          <div class="message">
+            <div style="color: var(--muted); font-size: 13px;">Ask a question about your data in plain English.</div>
+          </div>
+        </div>
+        <div id="input-bar">
+          <input id="question" type="text" placeholder="e.g. What are the top 10 customers by revenue?" autocomplete="off">
+          <button id="send-btn">Ask</button>
+        </div>
+      </div>
+
+      <div id="explorer-view">
+        <div id="explorer-header">
+          <h2 id="explorer-table-name">Select a table</h2>
+          <span id="explorer-info"></span>
+        </div>
+        <div id="explorer-table-wrap"></div>
+        <div id="explorer-pagination">
+          <button id="prev-btn" disabled>Prev</button>
+          <span id="page-info"></span>
+          <button id="next-btn" disabled>Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PAGE_SIZE = 50;
+let tables = [];
+let explorerState = { table: null, offset: 0, total: 0 };
+
+// --- API ---
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  const data = await res.json();
+  if (!res.ok) throw data;
+  return data;
+}
+
+// --- Landing ---
+const landing = document.getElementById('landing');
+const appEl = document.getElementById('app');
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const landingStatus = document.getElementById('landing-status');
+
+dropzone.onclick = () => fileInput.click();
+dropzone.ondragover = e => { e.preventDefault(); dropzone.classList.add('dragover'); };
+dropzone.ondragleave = () => dropzone.classList.remove('dragover');
+dropzone.ondrop = e => { e.preventDefault(); dropzone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); };
+fileInput.onchange = () => handleFiles(fileInput.files);
+
+async function handleFiles(files) {
+  if (!files.length) return;
+  landingStatus.textContent = 'Loading...';
+  for (const file of files) {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/upload', { method: 'POST', body: form });
+    if (!res.ok) {
+      const err = await res.json();
+      landingStatus.textContent = 'Error: ' + (err.detail || JSON.stringify(err));
+      return;
+    }
+  }
+  enterApp();
+}
+
+async function enterApp() {
+  tables = await api('GET', '/api/tables');
+  renderTableList();
+  landing.classList.add('hidden');
+  appEl.classList.add('visible');
+}
+
+// Check if tables already loaded (CLI passed files)
+async function init() {
+  tables = await api('GET', '/api/tables');
+  if (tables.length > 0) {
+    enterApp();
+  }
+}
+
+// --- Add file from sidebar ---
+const addFileBtn = document.getElementById('add-file-btn');
+const addFileInput = document.getElementById('add-file-input');
+addFileBtn.onclick = () => addFileInput.click();
+addFileInput.onchange = async () => {
+  for (const file of addFileInput.files) {
+    const form = new FormData();
+    form.append('file', file);
+    await fetch('/api/upload', { method: 'POST', body: form });
+  }
+  tables = await api('GET', '/api/tables');
+  renderTableList();
+  addFileInput.value = '';
+};
+
+// --- Sidebar ---
+function renderTableList() {
+  const list = document.getElementById('table-list');
+  list.innerHTML = '';
+  tables.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'table-item';
+    div.innerHTML = `<div class="table-name">${t.name}</div><div class="table-meta">${t.row_count.toLocaleString()} rows &middot; ${t.columns.length} cols</div>`;
+    div.onclick = () => openTable(t.name);
+    list.appendChild(div);
+  });
+}
+
+// --- Tabs ---
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const name = tab.dataset.tab;
+    document.getElementById('chat-view').style.display = name === 'chat' ? 'flex' : 'none';
+    document.getElementById('explorer-view').style.display = name === 'explorer' ? 'flex' : 'none';
+  };
+});
+
+// --- Chat ---
+const messagesEl = document.getElementById('messages');
+const questionEl = document.getElementById('question');
+const sendBtn = document.getElementById('send-btn');
+
+function addMessage(html) {
+  const div = document.createElement('div');
+  div.className = 'message';
+  div.innerHTML = html;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+function renderTable(columns, rows) {
+  if (!rows.length) return '<div style="color:var(--muted)">No results</div>';
+  let html = '<table><thead><tr>';
+  columns.forEach(c => html += `<th>${c}</th>`);
+  html += '</tr></thead><tbody>';
+  rows.forEach(row => {
+    html += '<tr>';
+    row.forEach(v => html += `<td>${v === null ? '<span style="color:#ccc">NULL</span>' : String(v)}</td>`);
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+async function ask() {
+  const q = questionEl.value.trim();
+  if (!q) return;
+  questionEl.value = '';
+  sendBtn.disabled = true;
+
+  addMessage(`<div class="message-user">${q}</div>`);
+  const loading = addMessage('<div class="loading">Thinking</div>');
+
+  try {
+    const data = await api('POST', '/api/ask', { question: q });
+    loading.innerHTML = `
+      <div class="message-sql">${data.sql}<button class="edit-btn" onclick="editSql(this)">Edit</button></div>
+      <div class="message-result">${renderTable(data.columns, data.rows)}</div>
+    `;
+    maybeChart(data, loading);
+  } catch (err) {
+    const detail = err.detail || err;
+    const sql = detail.sql || '';
+    const error = detail.error || JSON.stringify(detail);
+    loading.innerHTML = `
+      ${sql ? `<div class="message-sql">${sql}</div>` : ''}
+      <div class="message-error">${error}</div>
+    `;
+  }
+  sendBtn.disabled = false;
+}
+
+async function editSql(btn) {
+  const sqlDiv = btn.parentElement;
+  const currentSql = sqlDiv.childNodes[0].textContent;
+  const textarea = document.createElement('textarea');
+  textarea.value = currentSql;
+  textarea.style.cssText = 'width:100%;min-height:60px;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:10px;font-family:var(--mono);font-size:12px;border-radius:6px;resize:vertical;outline:none;';
+  const runBtn = document.createElement('button');
+  runBtn.textContent = 'Run';
+  runBtn.style.cssText = 'margin-top:6px;background:var(--accent);color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-family:var(--font);font-weight:600;font-size:12px;';
+
+  const msg = sqlDiv.parentElement;
+  const resultDiv = msg.querySelector('.message-result') || msg.querySelector('.message-error');
+
+  sqlDiv.innerHTML = '';
+  sqlDiv.appendChild(textarea);
+  sqlDiv.appendChild(runBtn);
+  textarea.focus();
+
+  runBtn.onclick = async () => {
+    try {
+      const data = await api('POST', '/api/sql', { sql: textarea.value });
+      sqlDiv.innerHTML = `${textarea.value}<button class="edit-btn" onclick="editSql(this)">Edit</button>`;
+      if (resultDiv) resultDiv.innerHTML = renderTable(data.columns, data.rows);
+    } catch (err) {
+      const error = err.detail || err.error || JSON.stringify(err);
+      if (resultDiv) resultDiv.innerHTML = `<div class="message-error">${error}</div>`;
+    }
+  };
+}
+
+function maybeChart(data, msgEl) {
+  if (data.columns.length !== 2 || data.rows.length < 2 || data.rows.length > 30) return;
+  const nums = data.rows.every(r => typeof r[1] === 'number' || !isNaN(Number(r[1])));
+  if (!nums) return;
+
+  const container = document.createElement('div');
+  container.className = 'chart-container';
+  const canvas = document.createElement('canvas');
+  container.appendChild(canvas);
+  msgEl.appendChild(container);
+
+  const labels = data.rows.map(r => String(r[0]));
+  const values = data.rows.map(r => Number(r[1]));
+
+  if (!window.Chart) {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
+    script.onload = () => drawChart(canvas, labels, values, data.columns);
+    document.head.appendChild(script);
+  } else {
+    drawChart(canvas, labels, values, data.columns);
+  }
+}
+
+function drawChart(canvas, labels, values, columns) {
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: columns[1], data: values, backgroundColor: '#1a1a1a22', borderColor: '#1a1a1a', borderWidth: 1 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: '#f0f0f0' } },
+        y: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: '#f0f0f0' } }
+      }
+    }
+  });
+}
+
+sendBtn.onclick = ask;
+questionEl.onkeydown = e => { if (e.key === 'Enter') ask(); };
+
+// --- Explorer ---
+async function openTable(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('[data-tab="explorer"]').classList.add('active');
+  document.getElementById('chat-view').style.display = 'none';
+  document.getElementById('explorer-view').style.display = 'flex';
+
+  document.querySelectorAll('.table-item').forEach(el => {
+    el.classList.toggle('active', el.querySelector('.table-name').textContent === name);
+  });
+
+  explorerState.table = name;
+  explorerState.offset = 0;
+  await loadExplorerPage();
+}
+
+async function loadExplorerPage() {
+  const { table, offset } = explorerState;
+  const data = await api('GET', `/api/tables/${table}?limit=${PAGE_SIZE}&offset=${offset}`);
+  explorerState.total = data.total;
+
+  document.getElementById('explorer-table-name').textContent = table;
+  document.getElementById('explorer-info').textContent = `${data.total.toLocaleString()} rows`;
+  document.getElementById('explorer-table-wrap').innerHTML = renderTable(data.columns, data.rows);
+
+  const end = Math.min(offset + PAGE_SIZE, data.total);
+  document.getElementById('page-info').textContent = `${offset + 1}–${end} of ${data.total.toLocaleString()}`;
+  document.getElementById('prev-btn').disabled = offset === 0;
+  document.getElementById('next-btn').disabled = end >= data.total;
+}
+
+document.getElementById('prev-btn').onclick = () => {
+  explorerState.offset = Math.max(0, explorerState.offset - PAGE_SIZE);
+  loadExplorerPage();
+};
+document.getElementById('next-btn').onclick = () => {
+  explorerState.offset += PAGE_SIZE;
+  loadExplorerPage();
+};
+
+// --- Start ---
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quickinsight"
+version = "0.1.0"
+description = "Chat with your data. Fully local."
+readme = "spec.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "duckdb>=1.0",
+    "huggingface-hub>=0.25",
+]
+
+[project.scripts]
+quickinsight = "quickinsight.cli:main"

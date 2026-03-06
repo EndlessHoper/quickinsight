@@ -1,0 +1,11 @@
+customer,product,amount,date
+Acme Corp,Widget A,1500,2025-01-15
+Beta Inc,Widget B,2300,2025-01-20
+Acme Corp,Widget C,800,2025-02-01
+Gamma LLC,Widget A,3100,2025-02-10
+Beta Inc,Widget A,1700,2025-02-15
+Delta Co,Widget B,950,2025-03-01
+Acme Corp,Widget B,2100,2025-03-05
+Gamma LLC,Widget C,1800,2025-03-12
+Delta Co,Widget A,4200,2025-03-20
+Beta Inc,Widget C,1100,2025-04-01
