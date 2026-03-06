@@ -22,21 +22,18 @@ class SqlRequest(BaseModel):
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
-    suffix = Path(file.filename).suffix
-    if suffix not in (".csv", ".sql"):
-        raise HTTPException(400, "Only .csv and .sql files are supported")
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in (".csv", ".sql", ".db", ".sqlite", ".sqlite3", ".parquet"):
+        raise HTTPException(400, "Supported: .csv, .sql, .db, .sqlite, .parquet")
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await file.read()
-        tmp.write(content)
-        tmp_path = Path(tmp.name)
+    # Stream to disk in chunks instead of buffering in RAM
+    tmp_path = Path(tempfile.gettempdir()) / file.filename
+    with open(tmp_path, "wb") as f:
+        while chunk := await file.read(1024 * 1024):  # 1MB chunks
+            f.write(chunk)
 
-    # Use the original filename (without extension) as table name
-    tmp_path_with_name = tmp_path.parent / file.filename
-    tmp_path.rename(tmp_path_with_name)
-
-    db.load_path(tmp_path_with_name)
-    tmp_path_with_name.unlink(missing_ok=True)
+    db.load_path(tmp_path)
+    tmp_path.unlink(missing_ok=True)
     return {"tables": db.tables()}
 
 
@@ -80,7 +77,10 @@ def ask(req: AskRequest):
         except Exception as e:
             raise HTTPException(400, {"sql": sql, "error": str(e)})
 
-    return {"sql": sql, **result}
+    # Generate a plain-English explanation
+    explanation = llm.explain_results(req.question, sql, result["columns"], result["rows"])
+
+    return {"sql": sql, "explanation": explanation, **result}
 
 
 # Serve frontend

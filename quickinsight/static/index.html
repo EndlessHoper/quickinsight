@@ -78,7 +78,20 @@ body {
   color: var(--muted);
   font-size: 13px;
   min-height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 #landing-footer {
   position: fixed;
   bottom: 24px;
@@ -215,6 +228,11 @@ body {
   font-family: var(--font);
 }
 .message-sql .edit-btn:hover { color: var(--text); border-color: var(--text); }
+.message-explanation {
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
 .message-result { overflow-x: auto; }
 .message-error {
   color: var(--error);
@@ -330,9 +348,7 @@ tr:hover td { background: #fafafa; }
 #explorer-pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* Loading */
-.loading { color: var(--muted); padding: 8px 0; font-size: 13px; }
-.loading::after { content: '...'; animation: dots 1.5s steps(3, end) infinite; }
-@keyframes dots { 0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; } }
+.loading { color: var(--muted); padding: 8px 0; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 
 /* Chart */
 .chart-container {
@@ -354,9 +370,9 @@ tr:hover td { background: #fafafa; }
   <div id="dropzone">
     <div class="icon">+</div>
     <div class="label">Drop a file here or click to select</div>
-    <div class="sublabel">.csv or .sql</div>
+    <div class="sublabel">.csv, .sql, .db, .sqlite, .parquet</div>
   </div>
-  <input type="file" id="file-input" accept=".csv,.sql" multiple>
+  <input type="file" id="file-input" accept=".csv,.sql,.db,.sqlite,.sqlite3,.parquet" multiple>
   <div id="landing-status"></div>
   <div id="landing-footer">Everything runs on your machine. Nothing leaves localhost.</div>
 </div>
@@ -366,7 +382,7 @@ tr:hover td { background: #fafafa; }
   <div id="sidebar">
     <div id="sidebar-header">Tables <span>QuickInsight</span></div>
     <div id="add-file-btn">+ Add file</div>
-    <input type="file" id="add-file-input" accept=".csv,.sql" multiple style="display:none">
+    <input type="file" id="add-file-input" accept=".csv,.sql,.db,.sqlite,.sqlite3,.parquet" multiple style="display:none">
     <div id="table-list"></div>
   </div>
 
@@ -435,14 +451,20 @@ fileInput.onchange = () => handleFiles(fileInput.files);
 
 async function handleFiles(files) {
   if (!files.length) return;
-  landingStatus.textContent = 'Loading...';
-  for (const file of files) {
+  dropzone.style.pointerEvents = 'none';
+  dropzone.style.opacity = '0.5';
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const size = file.size > 1e6 ? (file.size / 1e6).toFixed(0) + ' MB' : (file.size / 1e3).toFixed(0) + ' KB';
+    landingStatus.innerHTML = `<div class="spinner"></div> Loading ${file.name} (${size})`;
     const form = new FormData();
     form.append('file', file);
     const res = await fetch('/api/upload', { method: 'POST', body: form });
     if (!res.ok) {
       const err = await res.json();
-      landingStatus.textContent = 'Error: ' + (err.detail || JSON.stringify(err));
+      landingStatus.innerHTML = 'Error: ' + (err.detail || JSON.stringify(err));
+      dropzone.style.pointerEvents = '';
+      dropzone.style.opacity = '';
       return;
     }
   }
@@ -538,13 +560,14 @@ async function ask() {
   sendBtn.disabled = true;
 
   addMessage(`<div class="message-user">${q}</div>`);
-  const loading = addMessage('<div class="loading">Thinking</div>');
+  const loading = addMessage('<div class="loading"><div class="spinner"></div> Thinking</div>');
 
   try {
     const data = await api('POST', '/api/ask', { question: q });
     loading.innerHTML = `
-      <div class="message-sql">${data.sql}<button class="edit-btn" onclick="editSql(this)">Edit</button></div>
+      ${data.explanation ? `<div class="message-explanation">${data.explanation}</div>` : ''}
       <div class="message-result">${renderTable(data.columns, data.rows)}</div>
+      <div class="message-sql">${data.sql}<button class="edit-btn" onclick="editSql(this)">Edit</button></div>
     `;
     maybeChart(data, loading);
   } catch (err) {

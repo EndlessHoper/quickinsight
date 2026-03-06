@@ -5,7 +5,7 @@ import subprocess
 import time
 import urllib.request
 
-SYSTEM_PROMPT = """/no_think
+SQL_PROMPT = """/no_think
 You are a DuckDB SQL expert. Given the following tables:
 
 {schema}
@@ -14,7 +14,23 @@ Rules:
 - Return ONLY the SQL query, no explanation, no markdown fences
 - Use DuckDB SQL syntax
 - Always qualify column names with table names when joining
+- The results will be displayed in a UI table for a human to read
+- ALWAYS add LIMIT 20 unless the user explicitly asks for all rows or a specific count
+- For "show me", "what are", "list" type questions, default to LIMIT 10
+- For aggregations (COUNT, SUM, AVG, etc), limit to top/bottom 20 groups
+- Use ORDER BY to show the most relevant results first
 - If asked for a summary or description, use appropriate aggregations"""
+
+EXPLAIN_PROMPT = """/no_think
+You are a helpful data analyst. The user asked: {question}
+
+The SQL query run was:
+{sql}
+
+The results were (showing column names then rows):
+{results}
+
+Write a brief, natural language summary of the findings. Be specific with numbers. Keep it to 2-3 sentences. Do not repeat the question. Do not mention SQL."""
 
 DEFAULT_MODEL_REPO = "unsloth/Qwen3.5-4B-GGUF"
 DEFAULT_MODEL_FILE = "Qwen3.5-4B-Q4_K_M.gguf"
@@ -77,9 +93,22 @@ class LLM:
             self._process.wait()
 
     def generate_sql(self, schema: str, question: str) -> str:
-        prompt = SYSTEM_PROMPT.format(schema=schema)
+        prompt = SQL_PROMPT.format(schema=schema)
         user_msg = f"Write a DuckDB SQL query that answers: {question}"
         return self._call_api(prompt, user_msg)
+
+    def explain_results(self, question: str, sql: str, columns: list, rows: list) -> str:
+        # Format results as a readable table for the LLM
+        header = " | ".join(columns)
+        lines = [header]
+        for row in rows[:15]:  # Don't send too many rows
+            lines.append(" | ".join(str(v) for v in row))
+        results_text = "\n".join(lines)
+
+        prompt = EXPLAIN_PROMPT.format(
+            question=question, sql=sql, results=results_text,
+        )
+        return self._call_api(prompt, "Summarize these results.")
 
     def _call_api(self, system: str, user: str) -> str:
         body = json.dumps({
