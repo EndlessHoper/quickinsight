@@ -1,4 +1,4 @@
-# QuickData
+# QuickInsight
 
 Chat with your data. Fully local.
 
@@ -7,7 +7,7 @@ Chat with your data. Fully local.
 You have a CSV. You want answers. You run one command:
 
 ```
-quickdata sales.csv
+quickinsight sales.csv
 ```
 
 A browser opens. You see your data. You ask questions in plain English. You get answers — with the SQL shown, editable, re-runnable.
@@ -45,8 +45,8 @@ CSV / SQL file
 
 - **CSV** — DuckDB reads it natively. Auto-detects delimiters, headers, types.
 - **SQL dump files** — Executed directly against DuckDB. Supports CREATE TABLE + INSERT statements.
-- Multiple files at once: `quickdata sales.csv customers.csv` creates multiple tables.
-- Directory: `quickdata ./data/` loads all CSV/SQL files in the directory.
+- Multiple files at once: `quickinsight sales.csv customers.csv` creates multiple tables.
+- Directory: `quickinsight ./data/` loads all CSV/SQL files in the directory.
 
 ## Architecture
 
@@ -69,7 +69,7 @@ CSV / SQL file
 ### LLM
 
 - **Model:** Qwen3.5-4B (Q4_K_M GGUF, ~2.5GB)
-- Downloaded automatically on first run to `~/.quickdata/models/`
+- Downloaded automatically on first run to `~/.quickinsight/models/`
 - Served via llama-cpp-python in-process (no separate server)
 
 ### Text-to-SQL prompt
@@ -95,7 +95,7 @@ If the generated SQL errors, the error message is fed back to the LLM for one re
 ## CLI
 
 ```
-quickdata <file_or_files_or_directory>
+quickinsight <file_or_files_or_directory>
 ```
 
 Options:
@@ -106,7 +106,7 @@ Options:
 ## Install
 
 ```
-pip install quickdata
+pip install quickinsight
 ```
 
 Requires Python 3.10+. Model downloads on first run (~2.5GB).
