@@ -77,7 +77,13 @@ body {
 #landing-status {
   color: var(--muted);
   font-size: 13px;
-  min-height: 20px;
+  min-height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+#landing-status .status-text {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -90,8 +96,24 @@ body {
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   display: inline-block;
+  flex-shrink: 0;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.progress-bar-wrap {
+  width: 320px;
+  max-width: 80vw;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--text);
+  border-radius: 2px;
+  transition: width 0.2s;
+  width: 0%;
+}
 #landing-footer {
   position: fixed;
   bottom: 24px;
@@ -449,19 +471,69 @@ dropzone.ondragleave = () => dropzone.classList.remove('dragover');
 dropzone.ondrop = e => { e.preventDefault(); dropzone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); };
 fileInput.onchange = () => handleFiles(fileInput.files);
 
+function formatSize(bytes) {
+  if (bytes > 1e9) return (bytes / 1e9).toFixed(1) + ' GB';
+  if (bytes > 1e6) return (bytes / 1e6).toFixed(0) + ' MB';
+  return (bytes / 1e3).toFixed(0) + ' KB';
+}
+
+function uploadFile(file) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const form = new FormData();
+    form.append('file', file);
+    const size = formatSize(file.size);
+    let uploadDone = false;
+    let startTime = Date.now();
+    let timerInterval;
+
+    // Upload progress
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      const pct = Math.round(e.loaded / e.total * 100);
+      const loaded = formatSize(e.loaded);
+      landingStatus.innerHTML = `
+        <div class="status-text"><div class="spinner"></div> Uploading ${file.name} — ${loaded} / ${size} (${pct}%)</div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+      `;
+    };
+
+    xhr.upload.onload = () => {
+      uploadDone = true;
+      startTime = Date.now();
+      timerInterval = setInterval(() => {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+        landingStatus.innerHTML = `
+          <div class="status-text"><div class="spinner"></div> Processing ${file.name} (${size})... ${elapsed}s</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:100%"></div></div>
+        `;
+      }, 500);
+    };
+
+    xhr.onload = () => {
+      clearInterval(timerInterval);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText));
+      } else {
+        try { reject(JSON.parse(xhr.responseText)); }
+        catch { reject({ detail: xhr.statusText }); }
+      }
+    };
+    xhr.onerror = () => { clearInterval(timerInterval); reject({ detail: 'Upload failed' }); };
+
+    xhr.open('POST', '/api/upload');
+    xhr.send(form);
+  });
+}
+
 async function handleFiles(files) {
   if (!files.length) return;
   dropzone.style.pointerEvents = 'none';
   dropzone.style.opacity = '0.5';
   for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const size = file.size > 1e6 ? (file.size / 1e6).toFixed(0) + ' MB' : (file.size / 1e3).toFixed(0) + ' KB';
-    landingStatus.innerHTML = `<div class="spinner"></div> Loading ${file.name} (${size})`;
-    const form = new FormData();
-    form.append('file', file);
-    const res = await fetch('/api/upload', { method: 'POST', body: form });
-    if (!res.ok) {
-      const err = await res.json();
+    try {
+      await uploadFile(files[i]);
+    } catch (err) {
       landingStatus.innerHTML = 'Error: ' + (err.detail || JSON.stringify(err));
       dropzone.style.pointerEvents = '';
       dropzone.style.opacity = '';
